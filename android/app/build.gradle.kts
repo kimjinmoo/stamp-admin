@@ -43,3 +43,5 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+tasks.register("prepareKotlinBuildScriptModel") {}
