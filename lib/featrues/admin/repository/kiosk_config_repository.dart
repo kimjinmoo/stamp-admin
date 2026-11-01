@@ -23,6 +23,15 @@ class KioskConfigRepository {
         final decoded = jsonDecode(adsJsonString) as List<dynamic>;
         ads = decoded
             .map((item) => AdItem.fromJson(Map<String, dynamic>.from(item as Map)))
+            .map((item) {
+              // 403 Forbidden 구버전 Google Cloud Storage 비디오 URL 자동 마이그레이션
+              if (item.path.contains('commondatastorage.googleapis.com')) {
+                return item.copyWith(
+                  path: 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
+                );
+              }
+              return item;
+            })
             .toList();
       } catch (_) {
         ads = AdItem.defaultAds;

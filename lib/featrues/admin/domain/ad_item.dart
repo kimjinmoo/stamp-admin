@@ -85,8 +85,8 @@ class AdItem {
           title: '키오스크 홍보 프로모션 영상',
           type: AdMediaType.video,
           sourceType: AdSourceType.network,
-          // 안정적인 공개 H.264 테스트 MP4 영상 (Big Buck Bunny 10초 버전)
-          path: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+          // 안정적인 공개 H.264 테스트 MP4 영상 (공식 CDN)
+          path: 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
           durationSeconds: 15,
         ),
         const AdItem(

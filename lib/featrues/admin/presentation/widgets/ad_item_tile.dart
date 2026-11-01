@@ -71,7 +71,10 @@ class AdItemTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -95,7 +98,6 @@ class AdItemTile extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -114,13 +116,26 @@ class AdItemTile extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${item.durationSeconds}초',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.body,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceSoft,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: AppColors.hairline,
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Text(
+                          '${item.durationSeconds}초',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.body,
+                          ),
                         ),
                       ),
                     ],

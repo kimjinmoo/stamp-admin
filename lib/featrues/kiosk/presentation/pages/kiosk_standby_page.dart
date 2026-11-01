@@ -147,39 +147,28 @@ class KioskStandbyPage extends ConsumerWidget {
               ),
             ),
 
-          // 5. 우측 상단 관리자 설정 버튼 & 히든 제스처 영역 (비밀번호 인증 후 진입)
+          // 5. 우측 상단 관리자 설정 영역 (완전 투명 배경에 은은하게 살짝 클릭 가능한 미니멀 디자인)
           if (!playback.isQrModalOpen)
             Positioned(
-              top: 24,
-              right: 24,
+              top: 16,
+              right: 16,
               child: SafeArea(
                 child: HiddenGestureDetector(
-                  size: 64,
+                  size: 56,
                   onTrigger: () => _handleAdminAccess(context, ref),
                   child: Container(
-                    width: 42,
-                    height: 42,
+                    width: 44,
+                    height: 44,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.5),
+                    decoration: const BoxDecoration(
+                      color: Colors.transparent,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.settings_rounded,
-                        size: 20,
-                        color: Colors.white,
+                        size: 16,
+                        color: Colors.white.withValues(alpha: 0.20),
                       ),
                       padding: EdgeInsets.zero,
                       onPressed: () => _handleAdminAccess(context, ref),

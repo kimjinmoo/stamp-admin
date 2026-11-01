@@ -1,6 +1,8 @@
+import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../domain/ad_item.dart';
 
@@ -129,10 +131,14 @@ class _AddAdDialogState extends State<AddAdDialog>
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final dialogMaxHeight = math.min(680.0, screenHeight > 400 ? screenHeight * 0.88 : screenHeight);
+
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
+        constraints: BoxConstraints(maxWidth: 520, maxHeight: dialogMaxHeight),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -307,9 +313,14 @@ class _AddAdDialogState extends State<AddAdDialog>
           TextField(
             controller: _durationController,
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ],
             decoration: const InputDecoration(
               labelText: '노출 시간 (초 단위)',
               hintText: '이미지 기본 5초, 영상 기본 15초',
+              suffixText: '초',
             ),
           ),
 
@@ -340,15 +351,15 @@ class _AddAdDialogState extends State<AddAdDialog>
         'duration': 5,
       },
       {
-        'title': 'For Bigger Blazes 프로모션 (영상)',
+        'title': '매장 홍보 버터플라이 (영상)',
         'type': AdMediaType.video,
-        'url': 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        'url': 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
         'duration': 15,
       },
       {
-        'title': 'For Bigger Escapes 쇼케이스 (영상)',
+        'title': '자연과 함께하는 커피 비디오 (영상)',
         'type': AdMediaType.video,
-        'url': 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+        'url': 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
         'duration': 15,
       },
       {

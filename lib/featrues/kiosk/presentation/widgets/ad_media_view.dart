@@ -192,6 +192,15 @@ class _AdMediaViewState extends State<AdMediaView> {
     _hasError = false;
   }
 
+  void _scheduleFallbackTimer() {
+    if (_imageTimer != null) return;
+    _imageTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && !widget.isPaused) {
+        widget.onMediaFinished();
+      }
+    });
+  }
+
   void _startCurrentMedia() {
     final ad = _currentAd;
     if (ad == null) return;
@@ -353,13 +362,17 @@ class _AdMediaViewState extends State<AdMediaView> {
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        // 로딩 중일 때 무거운 검은색 스피너를 전면에 띄우지 않고,
-        // Stack 아래에 있는 이전 광고 화면이 자연스럽게 유지되도록 처리!
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const SizedBox.expand();
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded) return child;
+          return AnimatedOpacity(
+            opacity: frame == null ? 0 : 1,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOut,
+            child: child,
+          );
         },
         errorBuilder: (context, error, stackTrace) {
+          _scheduleFallbackTimer();
           return _buildErrorPlaceholder(ad);
         },
       );
@@ -375,7 +388,17 @@ class _AdMediaViewState extends State<AdMediaView> {
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded) return child;
+            return AnimatedOpacity(
+              opacity: frame == null ? 0 : 1,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOut,
+              child: child,
+            );
+          },
           errorBuilder: (context, error, stackTrace) {
+            _scheduleFallbackTimer();
             return _buildErrorPlaceholder(ad);
           },
         );
@@ -385,6 +408,7 @@ class _AdMediaViewState extends State<AdMediaView> {
     return Stack(
       fit: StackFit.expand,
       children: [
+        _buildMediaBasePlaceholder(ad),
         imageWidget,
         _buildBottomGradientTitle(ad),
       ],
@@ -394,58 +418,95 @@ class _AdMediaViewState extends State<AdMediaView> {
   Widget _buildVideoView(AdItem ad) {
     final controller = _currentVideoController;
 
-    // 비디오가 아직 로딩 중이면 검은 스피너 대신 빈 화면(아래의 이전 광고 화면이 비침) 유지
-    if (controller == null || !controller.value.isInitialized) {
-      return const SizedBox.expand();
-    }
-
     return Stack(
       fit: StackFit.expand,
       children: [
-        Center(
-          child: AspectRatio(
-            aspectRatio: controller.value.aspectRatio,
-            child: VideoPlayer(controller),
+        _buildMediaBasePlaceholder(ad, isVideo: true),
+        if (controller != null && controller.value.isInitialized)
+          Center(
+            child: AspectRatio(
+              aspectRatio: controller.value.aspectRatio,
+              child: VideoPlayer(controller),
+            ),
+          )
+        else
+          const Center(
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Colors.white38,
+              ),
+            ),
           ),
-        ),
         _buildBottomGradientTitle(ad),
       ],
+    );
+  }
+
+  Widget _buildMediaBasePlaceholder(AdItem ad, {bool isVideo = false}) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0F172A),
+            Color(0xFF1E293B),
+            Color(0xFF0F172A),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Opacity(
+          opacity: 0.12,
+          child: Icon(
+            isVideo ? Icons.videocam_rounded : Icons.image_rounded,
+            size: 96,
+            color: Colors.white,
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildErrorPlaceholder(AdItem ad, {String? message}) {
     return Container(
       color: const Color(0xFF1E293B),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.broken_image_rounded,
-              color: AppColors.mutedSoft,
-              size: 56,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              ad.title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message ?? '미디어를 불러오지 못했습니다. 잠시 후 다음 화면으로 이동합니다.',
-              style: const TextStyle(
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.broken_image_rounded,
                 color: AppColors.mutedSoft,
-                fontSize: 13,
+                size: 40,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 10),
+              Text(
+                ad.title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                message ?? '미디어를 불러오지 못했습니다. 잠시 후 다음 화면으로 이동합니다.',
+                style: const TextStyle(
+                  color: AppColors.mutedSoft,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
