@@ -106,25 +106,28 @@ class AutoDismissBadge extends StatelessWidget {
         color: AppColors.surfaceStrong,
         borderRadius: BorderRadius.circular(9999),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.timer_outlined,
-            size: 16,
-            color: AppColors.muted,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '$remainingSeconds초 후 대기 화면으로 복귀',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.body,
-              fontFeatures: [FontFeature.tabularFigures()],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.timer_outlined,
+              size: 16,
+              color: AppColors.muted,
             ),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Text(
+              '$remainingSeconds초 후 대기 화면으로 복귀',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.body,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

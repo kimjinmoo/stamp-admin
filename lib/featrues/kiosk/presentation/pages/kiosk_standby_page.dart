@@ -53,88 +53,67 @@ class KioskStandbyPage extends ConsumerWidget {
               ),
             ),
 
-          // 3. 상단 헤더 UI (좌측: 매장명, 중앙: 터치 안내 배지)
+          // 3. 상단 헤더 UI (좌측: 매장명, 중앙: 터치 안내 배지 - 반응형 배치로 해상도별 오버플로우 방어)
           if (!playback.isQrModalOpen)
             Positioned(
               top: 24,
               left: 24,
-              right: 120, // 우측 히든 제스처 영역 침범 방지
+              right: 24,
               child: SafeArea(
-                child: Row(
-                  children: [
-                    // 매장 정보 칩
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(9999),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxWidth = constraints.maxWidth;
+                    // 가로 폭이 640px 이상이면 가로 정렬(Row), 미만이면 세로 정렬(Column)로 반응형 배치
+                    final isWideScreen = maxWidth >= 640;
+
+                    if (isWideScreen) {
+                      return Row(
                         children: [
-                          const Icon(
-                            Icons.storefront_rounded,
-                            size: 16,
-                            color: AppColors.primary,
+                          // 좌측: 매장 정보 칩 (최대 너비 제한 및 말줄임표로 오버플로우 방어)
+                          _buildStoreChip(config.placeName, maxWidth: 240),
+                          // 중앙: 터치 권유 플로팅 배지 (화면 중앙 정렬)
+                          Expanded(
+                            child: Center(
+                              child: _buildTouchBadge(
+                                onTap: () {
+                                  ref
+                                      .read(kioskPlaybackNotifierProvider.notifier)
+                                      .openQrModal();
+                                },
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
+                          // 우측: 히든 제스처 영역(100px)과 겹치지 않도록 대칭 안전 여백 확보
+                          const SizedBox(width: 100),
+                        ],
+                      );
+                    } else {
+                      // 모바일 / 세로형 키오스크 / 좁은 해상도: 세로 배치로 충돌 및 overflow 원천 차단
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 상단 좌측: 매장 정보 칩 (우측 100px 히든 제스처 영역 침범 방지)
+                          _buildStoreChip(
                             config.placeName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                            maxWidth: (maxWidth - 100).clamp(120.0, double.infinity),
+                          ),
+                          const SizedBox(height: 12),
+                          // 하단 중앙: 터치 권유 플로팅 배지 (FittedBox로 초소형 기기에서도 자동 스케일 다운)
+                          Center(
+                            child: _buildTouchBadge(
+                              maxWidth: maxWidth,
+                              onTap: () {
+                                ref
+                                    .read(kioskPlaybackNotifierProvider.notifier)
+                                    .openQrModal();
+                              },
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                    const Spacer(),
-                    // 중앙 터치 권유 플로팅 배지
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(9999),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.4),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.touch_app_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            '화면을 터치하여 스탬프를 적립하세요',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                      );
+                    }
+                  },
                 ),
               ),
             ),
@@ -142,26 +121,31 @@ class KioskStandbyPage extends ConsumerWidget {
           // 4. 하단 미디어 인디케이터 (현재 페이지 표시)
           if (!playback.isQrModalOpen && ads.length > 1)
             Positioned(
-              left: 0,
-              right: 0,
+              left: 24,
+              right: 24,
               bottom: 12,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(ads.length, (index) {
-                  final isSelected = index == currentAdIndex;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: isSelected ? 24 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.primary
-                          : Colors.white.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(9999),
-                    ),
-                  );
-                }),
+              child: Center(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(ads.length, (index) {
+                      final isSelected = index == currentAdIndex;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: isSelected ? 24 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.primary
+                              : Colors.white.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(9999),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
               ),
             ),
 
@@ -212,36 +196,129 @@ class KioskStandbyPage extends ConsumerWidget {
     );
   }
 
+  /// 좌측 매장 정보 칩 (말줄임표 및 최대 폭 제한으로 오버플로우 방어)
+  Widget _buildStoreChip(String placeName, {double? maxWidth}) {
+    return Container(
+      constraints: maxWidth != null ? BoxConstraints(maxWidth: maxWidth) : null,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 8,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.15),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.storefront_rounded,
+            size: 16,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              placeName,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 터치 권유 플로팅 배지 (FittedBox 적용으로 어떤 해상도에서도 오버플로우 방지 및 터치 인터랙션)
+  Widget _buildTouchBadge({VoidCallback? onTap, double? maxWidth}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        constraints: maxWidth != null ? BoxConstraints(maxWidth: maxWidth) : null,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(9999),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.touch_app_rounded,
+                size: 18,
+                color: Colors.white,
+              ),
+              SizedBox(width: 8),
+              Text(
+                '화면을 터치하여 스탬프를 적립하세요',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyPlaceholder() {
     return Container(
       color: const Color(0xFF0F172A),
       child: const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.tv_rounded,
-              size: 64,
-              color: AppColors.mutedSoft,
-            ),
-            SizedBox(height: 16),
-            Text(
-              '등록된 광고 미디어가 없습니다.',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              '우측 상단을 5회 터치하여 광고를 추가해 주세요.',
-              style: TextStyle(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.tv_rounded,
+                size: 64,
                 color: AppColors.mutedSoft,
-                fontSize: 14,
               ),
-            ),
-          ],
+              SizedBox(height: 16),
+              Text(
+                '등록된 광고 미디어가 없습니다.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '우측 상단을 5회 터치하여 광고를 추가해 주세요.',
+                style: TextStyle(
+                  color: AppColors.mutedSoft,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -25,27 +25,29 @@ class QrDisplayModal extends ConsumerWidget {
         ref.read(kioskPlaybackNotifierProvider.notifier).resetAutoDismissCountdown();
       },
       child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
-            decoration: BoxDecoration(
-              color: AppColors.canvas,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: AppColors.hairline, width: 1),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A0F172A),
-                  blurRadius: 32,
-                  offset: Offset(0, 16),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
+              decoration: BoxDecoration(
+                color: AppColors.canvas,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: AppColors.hairline, width: 1),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1A0F172A),
+                    blurRadius: 32,
+                    offset: Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 // 상단 헤더: 매장명 & 닫기 버튼
                 Row(
                   children: [
@@ -128,19 +130,22 @@ class QrDisplayModal extends ConsumerWidget {
                             width: 1,
                           ),
                         ),
-                        child: QrImageView(
-                          data: qrData,
-                          version: QrVersions.auto,
-                          size: 210,
-                          eyeStyle: const QrEyeStyle(
-                            eyeShape: QrEyeShape.square,
-                            color: AppColors.ink,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: QrImageView(
+                            data: qrData,
+                            version: QrVersions.auto,
+                            size: 210,
+                            eyeStyle: const QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: AppColors.ink,
+                            ),
+                            dataModuleStyle: const QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: AppColors.ink,
+                            ),
+                            errorCorrectionLevel: QrErrorCorrectLevel.M,
                           ),
-                          dataModuleStyle: const QrDataModuleStyle(
-                            dataModuleShape: QrDataModuleShape.square,
-                            color: AppColors.ink,
-                          ),
-                          errorCorrectionLevel: QrErrorCorrectLevel.M,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -214,6 +219,7 @@ class QrDisplayModal extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
