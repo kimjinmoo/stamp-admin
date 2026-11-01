@@ -14,6 +14,7 @@ class KioskConfigRepository {
   Future<KioskConfig> loadConfig() async {
     final placeId = _prefs.getString(KioskConstants.prefKeyPlaceId) ?? KioskConstants.defaultPlaceId;
     final placeName = _prefs.getString(KioskConstants.prefKeyPlaceName) ?? KioskConstants.defaultPlaceName;
+    final adminPin = _prefs.getString(KioskConstants.prefKeyAdminPin) ?? KioskConstants.defaultAdminPin;
     final adsJsonString = _prefs.getString(KioskConstants.prefKeyAdList);
 
     List<AdItem> ads = AdItem.defaultAds;
@@ -32,6 +33,7 @@ class KioskConfigRepository {
       placeId: placeId,
       placeName: placeName,
       ads: ads.isNotEmpty ? ads : AdItem.defaultAds,
+      adminPin: adminPin,
     );
   }
 
@@ -39,6 +41,7 @@ class KioskConfigRepository {
   Future<void> saveConfig(KioskConfig config) async {
     await _prefs.setString(KioskConstants.prefKeyPlaceId, config.placeId);
     await _prefs.setString(KioskConstants.prefKeyPlaceName, config.placeName);
+    await _prefs.setString(KioskConstants.prefKeyAdminPin, config.adminPin);
     final adsJson = jsonEncode(config.ads.map((e) => e.toJson()).toList());
     await _prefs.setString(KioskConstants.prefKeyAdList, adsJson);
   }
@@ -47,6 +50,11 @@ class KioskConfigRepository {
   Future<void> updatePlaceInfo({required String placeId, required String placeName}) async {
     await _prefs.setString(KioskConstants.prefKeyPlaceId, placeId);
     await _prefs.setString(KioskConstants.prefKeyPlaceName, placeName);
+  }
+
+  /// 관리자 비밀번호 업데이트
+  Future<void> updateAdminPin(String pin) async {
+    await _prefs.setString(KioskConstants.prefKeyAdminPin, pin);
   }
 
   /// 광고 목록만 업데이트
@@ -60,6 +68,7 @@ class KioskConfigRepository {
     await _prefs.remove(KioskConstants.prefKeyPlaceId);
     await _prefs.remove(KioskConstants.prefKeyPlaceName);
     await _prefs.remove(KioskConstants.prefKeyAdList);
+    await _prefs.remove(KioskConstants.prefKeyAdminPin);
     return KioskConfig.initial();
   }
 }

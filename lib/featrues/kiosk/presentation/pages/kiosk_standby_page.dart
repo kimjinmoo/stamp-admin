@@ -6,6 +6,7 @@ import 'package:stamp_admin/featrues/admin/presentation/pages/admin_settings_pag
 import 'package:stamp_admin/featrues/admin/provider/kiosk_config_provider.dart';
 import 'package:stamp_admin/featrues/kiosk/presentation/pages/qr_display_modal.dart';
 import 'package:stamp_admin/featrues/kiosk/presentation/widgets/ad_media_view.dart';
+import 'package:stamp_admin/featrues/kiosk/presentation/widgets/admin_pin_dialog.dart';
 import 'package:stamp_admin/featrues/kiosk/presentation/widgets/hidden_gesture_detector.dart';
 import 'package:stamp_admin/featrues/kiosk/provider/kiosk_playback_provider.dart';
 
@@ -149,29 +150,48 @@ class KioskStandbyPage extends ConsumerWidget {
               ),
             ),
 
-          // 5. 우측 상단 모서리 관리자 히든 제스처 영역 (5회 탭 또는 롱프레스)
-          Positioned(
-            top: 0,
-            right: 0,
-            child: SafeArea(
-              child: HiddenGestureDetector(
-                size: 100,
-                onTrigger: () {
-                  // 일시정지 상태로 관리자 페이지 진입
-                  ref.read(kioskPlaybackNotifierProvider.notifier).closeQrModal();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const AdminSettingsPage(),
+          // 5. 우측 상단 관리자 설정 버튼 & 히든 제스처 영역 (비밀번호 인증 후 진입)
+          if (!playback.isQrModalOpen)
+            Positioned(
+              top: 24,
+              right: 24,
+              child: SafeArea(
+                child: HiddenGestureDetector(
+                  size: 64,
+                  onTrigger: () => _handleAdminAccess(context, ref),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                  );
-                },
-                child: Container(
-                  // 투명 터치 영역 (디버그 모드에서 시각적 힌트 줄 수도 있음)
-                  color: Colors.transparent,
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.settings_rounded,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _handleAdminAccess(context, ref),
+                      tooltip: '관리자 설정 (초기 비밀번호: 0000)',
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
 
           // 6. QR 발급 모달 오버레이 (화면 터치 시 등장)
           if (playback.isQrModalOpen) ...[
@@ -194,6 +214,21 @@ class KioskStandbyPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// 관리자 비밀번호 확인 후 설정 페이지로 진입
+  Future<void> _handleAdminAccess(BuildContext context, WidgetRef ref) async {
+    final config = ref.read(kioskConfigNotifierProvider);
+    final isAuthorized = await AdminPinDialog.show(context, config.adminPin);
+
+    if (isAuthorized && context.mounted) {
+      ref.read(kioskPlaybackNotifierProvider.notifier).closeQrModal();
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const AdminSettingsPage(),
+        ),
+      );
+    }
   }
 
   /// 좌측 매장 정보 칩 (말줄임표 및 최대 폭 제한으로 오버플로우 방어)

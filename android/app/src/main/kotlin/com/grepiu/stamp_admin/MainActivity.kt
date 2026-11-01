@@ -1,4 +1,4 @@
-package com.example.stamp_admin
+package com.grepiu.stamp_admin
 
 import io.flutter.embedding.android.FlutterActivity
 

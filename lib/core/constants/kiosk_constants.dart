@@ -14,12 +14,14 @@ class KioskConstants {
   static const int adminGestureTapCount = 5; // 5회 연속 탭
   static const int adminGestureTimeLimitMs = 3000; // 3초 이내 5회 탭
 
-  // 기본 매장 정보
+  // 기본 매장 정보 및 관리자 보안
   static const String defaultPlaceId = 'STORE_SEOUL_001';
   static const String defaultPlaceName = '강남 본점';
+  static const String defaultAdminPin = '0000'; // 초기 관리자 비밀번호
 
   // SharedPreferences 키
   static const String prefKeyPlaceId = 'stamp_kiosk_place_id';
   static const String prefKeyPlaceName = 'stamp_kiosk_place_name';
   static const String prefKeyAdList = 'stamp_kiosk_ad_list';
+  static const String prefKeyAdminPin = 'stamp_kiosk_admin_pin';
 }

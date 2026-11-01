@@ -8,7 +8,7 @@
 PRODUCT_NAME = stamp_admin
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.stampAdmin
+PRODUCT_BUNDLE_IDENTIFIER = com.grepiu.stamp-admin
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.

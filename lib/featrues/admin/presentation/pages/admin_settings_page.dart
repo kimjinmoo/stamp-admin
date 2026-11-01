@@ -17,6 +17,15 @@ class AdminSettingsPage extends ConsumerStatefulWidget {
 class _AdminSettingsPageState extends ConsumerState<AdminSettingsPage> {
   final _placeIdController = TextEditingController();
   final _placeNameController = TextEditingController();
+
+  // 비밀번호 변경 컨트롤러
+  final _currentPinController = TextEditingController();
+  final _newPinController = TextEditingController();
+  final _confirmPinController = TextEditingController();
+  bool _obscureCurrentPin = true;
+  bool _obscureNewPin = true;
+  bool _obscureConfirmPin = true;
+
   bool _isSyncing = false;
 
   @override
@@ -31,6 +40,9 @@ class _AdminSettingsPageState extends ConsumerState<AdminSettingsPage> {
   void dispose() {
     _placeIdController.dispose();
     _placeNameController.dispose();
+    _currentPinController.dispose();
+    _newPinController.dispose();
+    _confirmPinController.dispose();
     super.dispose();
   }
 
@@ -52,6 +64,53 @@ class _AdminSettingsPageState extends ConsumerState<AdminSettingsPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('매장 정보가 성공적으로 저장되었습니다.')),
+      );
+    }
+  }
+
+  Future<void> _saveAdminPin() async {
+    final currentPin = _currentPinController.text.trim();
+    final newPin = _newPinController.text.trim();
+    final confirmPin = _confirmPinController.text.trim();
+    final config = ref.read(kioskConfigNotifierProvider);
+
+    if (currentPin.isEmpty || newPin.isEmpty || confirmPin.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('모든 비밀번호 입력란을 입력해 주세요.')),
+      );
+      return;
+    }
+
+    if (currentPin != config.adminPin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('현재 비밀번호가 올바르지 않습니다.')),
+      );
+      return;
+    }
+
+    if (newPin.length < 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('새 비밀번호는 최소 4자리 이상이어야 합니다.')),
+      );
+      return;
+    }
+
+    if (newPin != confirmPin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('새 비밀번호와 확인 입력이 일치하지 않습니다.')),
+      );
+      return;
+    }
+
+    await ref.read(kioskConfigNotifierProvider.notifier).updateAdminPin(newPin);
+
+    _currentPinController.clear();
+    _newPinController.clear();
+    _confirmPinController.clear();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('관리자 비밀번호가 성공적으로 변경되었습니다.')),
       );
     }
   }
@@ -275,7 +334,106 @@ class _AdminSettingsPageState extends ConsumerState<AdminSettingsPage> {
 
                   const SizedBox(height: 20),
 
-                  // 3. 서버 동기화 섹션 (admin.md 3.C)
+                  // 3. 관리자 비밀번호 변경 카드
+                  _buildSectionCard(
+                    title: '관리자 접속 비밀번호 설정',
+                    subtitle: '키오스크 대기 화면에서 설정 화면 진입 시 필요한 보안 비밀번호입니다. (초기: 0000)',
+                    icon: Icons.password_rounded,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _currentPinController,
+                          obscureText: _obscureCurrentPin,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: '현재 비밀번호',
+                            hintText: '현재 설정된 비밀번호 (초기: 0000)',
+                            prefixIcon: const Icon(Icons.lock_outline_rounded),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureCurrentPin
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureCurrentPin = !_obscureCurrentPin;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _newPinController,
+                          obscureText: _obscureNewPin,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: '새 비밀번호',
+                            hintText: '4자리 이상 입력 (예: 1234)',
+                            prefixIcon: const Icon(Icons.lock_reset_rounded),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureNewPin
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureNewPin = !_obscureNewPin;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _confirmPinController,
+                          obscureText: _obscureConfirmPin,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: '새 비밀번호 확인',
+                            hintText: '새 비밀번호를 한 번 더 입력해 주세요',
+                            prefixIcon: const Icon(Icons.check_circle_outline_rounded),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureConfirmPin
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureConfirmPin = !_obscureConfirmPin;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: ElevatedButton.icon(
+                            onPressed: _saveAdminPin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(140, 46),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(Icons.vpn_key_rounded, size: 18),
+                            label: const Text('비밀번호 변경'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // 4. 서버 동기화 섹션 (admin.md 3.C)
                   _buildSectionCard(
                     title: '서버 동기화 및 관리 로그',
                     subtitle: '현재 설정 및 키오스크 발급 로그를 중앙 서버로 전송합니다.',

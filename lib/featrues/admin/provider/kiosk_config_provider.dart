@@ -45,6 +45,13 @@ class KioskConfigNotifier extends Notifier<KioskConfig> {
     );
   }
 
+  /// 관리자 비밀번호 변경 및 저장
+  Future<void> updateAdminPin(String newPin) async {
+    final updated = state.copyWith(adminPin: newPin.trim());
+    state = updated;
+    await _repository.updateAdminPin(updated.adminPin);
+  }
+
   /// 광고 항목 추가
   Future<void> addAd(AdItem item) async {
     final newAds = [...state.ads, item];

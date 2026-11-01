@@ -7,11 +7,13 @@ class KioskConfig {
   final String placeId;
   final String placeName;
   final List<AdItem> ads;
+  final String adminPin;
 
   const KioskConfig({
     required this.placeId,
     required this.placeName,
     required this.ads,
+    this.adminPin = KioskConstants.defaultAdminPin,
   });
 
   /// 기본 초기 설정
@@ -20,6 +22,7 @@ class KioskConfig {
       placeId: KioskConstants.defaultPlaceId,
       placeName: KioskConstants.defaultPlaceName,
       ads: AdItem.defaultAds,
+      adminPin: KioskConstants.defaultAdminPin,
     );
   }
 
@@ -27,11 +30,13 @@ class KioskConfig {
     String? placeId,
     String? placeName,
     List<AdItem>? ads,
+    String? adminPin,
   }) {
     return KioskConfig(
       placeId: placeId ?? this.placeId,
       placeName: placeName ?? this.placeName,
       ads: ads ?? this.ads,
+      adminPin: adminPin ?? this.adminPin,
     );
   }
 
@@ -40,6 +45,7 @@ class KioskConfig {
       'placeId': placeId,
       'placeName': placeName,
       'ads': ads.map((e) => e.toJson()).toList(),
+      'adminPin': adminPin,
     };
   }
 
@@ -53,6 +59,7 @@ class KioskConfig {
       placeId: json['placeId'] as String? ?? KioskConstants.defaultPlaceId,
       placeName: json['placeName'] as String? ?? KioskConstants.defaultPlaceName,
       ads: adsList.isNotEmpty ? adsList : AdItem.defaultAds,
+      adminPin: json['adminPin'] as String? ?? KioskConstants.defaultAdminPin,
     );
   }
 
