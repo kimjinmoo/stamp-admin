@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/theme/app_theme.dart';
 import 'featrues/admin/provider/kiosk_config_provider.dart';
-import 'featrues/kiosk/presentation/pages/kiosk_standby_page.dart';
+import 'featrues/kiosk/presentation/pages/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +42,7 @@ class StampAdminApp extends StatelessWidget {
       title: '스탬프 키오스크 관리자',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const KioskStandbyPage(),
+      home: const SplashScreen(),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:stamp_admin/core/theme/app_theme.dart';
 import 'package:stamp_admin/featrues/admin/domain/kiosk_config.dart';
 import 'package:stamp_admin/featrues/admin/provider/kiosk_config_provider.dart';
 import 'package:stamp_admin/featrues/kiosk/presentation/pages/kiosk_standby_page.dart';
+import 'package:stamp_admin/featrues/kiosk/presentation/pages/splash_screen.dart';
 
 void main() {
   group('KioskStandbyPage 해상도별 렌더링 및 Overflow 방어 테스트', () {
@@ -227,6 +228,38 @@ void main() {
 
       // Provider 상태에 변경된 비밀번호 반영 확인
       expect(container.read(kioskConfigNotifierProvider).adminPin, '9999');
+    });
+  });
+
+  group('SplashScreen 스플래시 화면 브랜딩 및 전환 테스트', () {
+    testWidgets('스플래시 화면이 정상 렌더링되고 브랜드 텍스트가 표시된다', (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const SplashScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // 브랜드 로고 및 타이틀 텍스트 확인
+      expect(find.text('STAMP KIOSK'), findsOneWidget);
+      expect(find.text('강남 본점'), findsOneWidget);
+      expect(find.text('키오스크 시스템을 준비하고 있습니다...'), findsOneWidget);
+
+      // 애니메이션 및 1800ms 경과 후 KioskStandbyPage로 전환 확인
+      await tester.pump(const Duration(milliseconds: 2000));
+      await tester.pumpAndSettle();
+
+      expect(find.text('화면을 터치하여 스탬프를 적립하세요'), findsOneWidget);
     });
   });
 }

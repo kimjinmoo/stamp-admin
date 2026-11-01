@@ -21,20 +21,17 @@ class KioskStandbyPage extends ConsumerWidget {
 
     final ads = config.ads;
     final currentAdIndex = playback.currentAdIndex;
-    final currentAd = (ads.isNotEmpty && currentAdIndex < ads.length)
-        ? ads[currentAdIndex]
-        : (ads.isNotEmpty ? ads.first : null);
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. 전체 화면 미디어 플레이어
-          if (currentAd != null)
+          // 1. 전체 화면 미디어 플레이어 (로딩 없는 사전 로딩 & 부드러운 크로스페이드 전환)
+          if (ads.isNotEmpty)
             AdMediaView(
-              key: ValueKey(currentAd.id),
-              adItem: currentAd,
+              ads: ads,
+              currentIndex: currentAdIndex,
               isPaused: playback.isQrModalOpen,
               onMediaFinished: () {
                 ref.read(kioskPlaybackNotifierProvider.notifier).nextAd();

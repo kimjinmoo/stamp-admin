@@ -6,18 +6,39 @@ import 'package:video_player/video_player.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../admin/domain/ad_item.dart';
 
-/// 이미지 및 동영상 광고를 통합 재생하는 미디어 뷰어 위젯
+/// 끊김 없는(Seamless) 광고 롤링 플레이어 위젯
+/// - 다음 미디어 사전 캐싱(Pre-caching) 및 백그라운드 프리로딩(Pre-warming)
+/// - 이전 미디어와 다음 미디어 간 부드러운 크로스페이드(Cross-fade) 전환
+/// - 광고 전환 중 로딩 스피너 깜빡임 원천 차단
 class AdMediaView extends StatefulWidget {
-  final AdItem adItem;
+  final List<AdItem> ads;
+  final int currentIndex;
   final bool isPaused;
   final VoidCallback onMediaFinished;
 
   const AdMediaView({
     super.key,
-    required this.adItem,
+    required this.ads,
+    required this.currentIndex,
     required this.isPaused,
     required this.onMediaFinished,
   });
+
+  /// 단일 광고 항목과의 레거시 호환을 위한 생성자
+  factory AdMediaView.single({
+    Key? key,
+    required AdItem adItem,
+    required bool isPaused,
+    required VoidCallback onMediaFinished,
+  }) {
+    return AdMediaView(
+      key: key,
+      ads: [adItem],
+      currentIndex: 0,
+      isPaused: isPaused,
+      onMediaFinished: onMediaFinished,
+    );
+  }
 
   @override
   State<AdMediaView> createState() => _AdMediaViewState();
@@ -25,25 +46,59 @@ class AdMediaView extends StatefulWidget {
 
 class _AdMediaViewState extends State<AdMediaView> {
   Timer? _imageTimer;
-  VideoPlayerController? _videoController;
-  bool _isVideoLoading = false;
+  VideoPlayerController? _currentVideoController;
+
+  // 다음 비디오를 백그라운드에서 미리 로드해두는 컨트롤러 캐시
+  final Map<String, VideoPlayerController> _videoCache = {};
+
+  // 초기화 진행 중인 비디오 ID 집합
+  final Set<String> _initializingVideoIds = {};
+
   bool _hasError = false;
   String _errorMessage = '';
+
+  AdItem? get _currentAd {
+    if (widget.ads.isEmpty) return null;
+    final index = widget.currentIndex.clamp(0, widget.ads.length - 1);
+    return widget.ads[index];
+  }
+
+  AdItem? get _nextAd {
+    if (widget.ads.length <= 1) return null;
+    final nextIndex = (widget.currentIndex + 1) % widget.ads.length;
+    return widget.ads[nextIndex];
+  }
 
   @override
   void initState() {
     super.initState();
-    _startMedia();
+    _startCurrentMedia();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 1. 모든 이미지 광고를 사전에 메모리에 미리 캐싱 (디코딩 지연 제거)
+    _precacheAllImages();
+    // 2. 다음 비디오가 있다면 백그라운드에서 미리 초기화
+    _preloadNextVideo();
   }
 
   @override
   void didUpdateWidget(covariant AdMediaView oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.adItem.id != widget.adItem.id ||
-        oldWidget.adItem.path != widget.adItem.path) {
-      _stopMedia();
-      _startMedia();
+    final oldAd = oldWidget.ads.isNotEmpty && oldWidget.currentIndex < oldWidget.ads.length
+        ? oldWidget.ads[oldWidget.currentIndex]
+        : null;
+    final newAd = _currentAd;
+
+    // 광고가 바뀌었을 때
+    if (oldAd?.id != newAd?.id || oldWidget.currentIndex != widget.currentIndex) {
+      _stopCurrentMediaTimer();
+      _startCurrentMedia();
+      _precacheAllImages();
+      _preloadNextVideo();
     } else if (oldWidget.isPaused != widget.isPaused) {
       if (widget.isPaused) {
         _pauseMedia();
@@ -55,52 +110,105 @@ class _AdMediaViewState extends State<AdMediaView> {
 
   @override
   void dispose() {
-    _stopMedia();
+    _stopCurrentMediaTimer();
+    _currentVideoController?.removeListener(_onVideoStatusChanged);
+    _currentVideoController = null;
+
+    // 캐시된 비디오 컨트롤러 전체 안전 해제
+    for (final controller in _videoCache.values) {
+      controller.dispose();
+    }
+    _videoCache.clear();
     super.dispose();
   }
 
-  void _stopMedia() {
-    _imageTimer?.cancel();
-    _imageTimer = null;
-    _videoController?.removeListener(_onVideoStatusChanged);
-    _videoController?.dispose();
-    _videoController = null;
-    _hasError = false;
-  }
+  /// 모든 이미지 광고를 Flutter 메모리 캐시에 백그라운드 사전 탑재
+  void _precacheAllImages() {
+    for (final ad in widget.ads) {
+      if (ad.type == AdMediaType.image && ad.path.isNotEmpty) {
+        try {
+          final ImageProvider provider = ad.sourceType == AdSourceType.network
+              ? NetworkImage(ad.path)
+              : FileImage(File(ad.path)) as ImageProvider;
 
-  void _startMedia() {
-    if (widget.adItem.type == AdMediaType.image) {
-      _startImageTimer();
-    } else {
-      _initVideoPlayer();
-    }
-  }
-
-  void _pauseMedia() {
-    _imageTimer?.cancel();
-    if (_videoController != null && _videoController!.value.isInitialized) {
-      _videoController!.pause();
-    }
-  }
-
-  void _resumeMedia() {
-    if (widget.adItem.type == AdMediaType.image) {
-      _startImageTimer();
-    } else {
-      if (_videoController != null && _videoController!.value.isInitialized) {
-        _videoController!.play();
+          precacheImage(
+            provider,
+            context,
+            onError: (exception, stackTrace) {
+              // 네트워크 오프라인 또는 테스트 환경 예외 흡수
+            },
+          );
+        } catch (_) {}
       }
     }
   }
 
-  void _startImageTimer() {
+  /// 다음 광고가 비디오일 경우 백그라운드에서 컨트롤러를 미리 생성하고 초기화(Pre-warming)
+  void _preloadNextVideo() {
+    final next = _nextAd;
+    if (next == null || next.type != AdMediaType.video || next.path.isEmpty) {
+      return;
+    }
+
+    if (_videoCache.containsKey(next.id) || _initializingVideoIds.contains(next.id)) {
+      return;
+    }
+
+    _initializingVideoIds.add(next.id);
+    _createVideoController(next).then((controller) async {
+      try {
+        await controller.initialize();
+        if (mounted) {
+          _videoCache[next.id] = controller;
+        } else {
+          controller.dispose();
+        }
+      } catch (_) {
+        controller.dispose();
+      } finally {
+        _initializingVideoIds.remove(next.id);
+      }
+    }).catchError((_) {
+      _initializingVideoIds.remove(next.id);
+    });
+  }
+
+  Future<VideoPlayerController> _createVideoController(AdItem item) async {
+    if (item.sourceType == AdSourceType.network) {
+      final uri = Uri.parse(item.path);
+      return VideoPlayerController.networkUrl(uri);
+    } else {
+      if (kIsWeb) {
+        throw UnsupportedError('웹 환경에서는 로컬 파일 비디오 직접 재생이 제한됩니다.');
+      }
+      return VideoPlayerController.file(File(item.path));
+    }
+  }
+
+  void _stopCurrentMediaTimer() {
+    _imageTimer?.cancel();
+    _imageTimer = null;
+    _currentVideoController?.removeListener(_onVideoStatusChanged);
+    _hasError = false;
+  }
+
+  void _startCurrentMedia() {
+    final ad = _currentAd;
+    if (ad == null) return;
+
+    if (ad.type == AdMediaType.image) {
+      _startImageTimer(ad);
+    } else {
+      _playVideoMedia(ad);
+    }
+  }
+
+  void _startImageTimer(AdItem ad) {
     _imageTimer?.cancel();
     if (widget.isPaused) return;
 
     final duration = Duration(
-      seconds: widget.adItem.durationSeconds > 0
-          ? widget.adItem.durationSeconds
-          : 5,
+      seconds: ad.durationSeconds > 0 ? ad.durationSeconds : 5,
     );
 
     _imageTimer = Timer(duration, () {
@@ -110,44 +218,43 @@ class _AdMediaViewState extends State<AdMediaView> {
     });
   }
 
-  Future<void> _initVideoPlayer() async {
-    setState(() {
-      _isVideoLoading = true;
-      _hasError = false;
-    });
+  Future<void> _playVideoMedia(AdItem ad) async {
+    // 1. 이미 프리워밍(Pre-warmed)된 컨트롤러가 캐시에 있는지 확인
+    VideoPlayerController? controller = _videoCache.remove(ad.id);
 
-    try {
-      if (widget.adItem.sourceType == AdSourceType.network) {
-        final uri = Uri.parse(widget.adItem.path);
-        _videoController = VideoPlayerController.networkUrl(uri);
-      } else {
-        if (kIsWeb) {
-          throw UnsupportedError('웹 환경에서는 로컬 파일 비디오 직접 재생이 제한됩니다.');
-        }
-        final file = File(widget.adItem.path);
-        _videoController = VideoPlayerController.file(file);
-      }
-
-      await _videoController!.initialize();
-      _videoController!.addListener(_onVideoStatusChanged);
-
+    if (controller != null && controller.value.isInitialized) {
+      _currentVideoController = controller;
+      _currentVideoController!.addListener(_onVideoStatusChanged);
+      await _currentVideoController!.seekTo(Duration.zero);
       if (!widget.isPaused && mounted) {
-        await _videoController!.play();
+        await _currentVideoController!.play();
       }
+      if (mounted) setState(() {});
+      return;
+    }
+
+    // 2. 캐시에 없으면 새로 생성 후 초기화
+    try {
+      controller = await _createVideoController(ad);
+      await controller.initialize();
 
       if (mounted) {
-        setState(() {
-          _isVideoLoading = false;
-        });
+        _currentVideoController = controller;
+        _currentVideoController!.addListener(_onVideoStatusChanged);
+        if (!widget.isPaused) {
+          await _currentVideoController!.play();
+        }
+        setState(() {});
+      } else {
+        controller.dispose();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _isVideoLoading = false;
           _hasError = true;
           _errorMessage = e.toString();
         });
-        // 에러 발생 시 3초 후 다음 미디어로 자동 스킵
+        // 비디오 재생 실패 시 3초 후 다음 미디어로 자동 스킵
         _imageTimer = Timer(const Duration(seconds: 3), () {
           if (mounted && !widget.isPaused) {
             widget.onMediaFinished();
@@ -158,14 +265,14 @@ class _AdMediaViewState extends State<AdMediaView> {
   }
 
   void _onVideoStatusChanged() {
-    if (_videoController == null || !_videoController!.value.isInitialized) {
+    if (_currentVideoController == null ||
+        !_currentVideoController!.value.isInitialized) {
       return;
     }
 
-    final pos = _videoController!.value.position;
-    final dur = _videoController!.value.duration;
+    final pos = _currentVideoController!.value.position;
+    final dur = _currentVideoController!.value.duration;
 
-    // 재생이 끝에 도달했거나 에러 상태일 때
     if (dur > Duration.zero && pos >= dur) {
       if (mounted && !widget.isPaused) {
         widget.onMediaFinished();
@@ -173,49 +280,103 @@ class _AdMediaViewState extends State<AdMediaView> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_hasError) {
-      return _buildErrorPlaceholder(
-        message: _errorMessage.isNotEmpty ? _errorMessage : null,
-      );
-    }
-
-    if (widget.adItem.type == AdMediaType.image) {
-      return _buildImageView();
-    } else {
-      return _buildVideoView();
+  void _pauseMedia() {
+    _imageTimer?.cancel();
+    if (_currentVideoController != null &&
+        _currentVideoController!.value.isInitialized) {
+      _currentVideoController!.pause();
     }
   }
 
-  Widget _buildImageView() {
+  void _resumeMedia() {
+    final ad = _currentAd;
+    if (ad == null) return;
+
+    if (ad.type == AdMediaType.image) {
+      _startImageTimer(ad);
+    } else {
+      if (_currentVideoController != null &&
+          _currentVideoController!.value.isInitialized) {
+        _currentVideoController!.play();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentAd = _currentAd;
+
+    if (currentAd == null) {
+      return Container(color: Colors.black);
+    }
+
+    // 부드러운 무한 롤링 크로스페이드 (Cross-fade)
+    // 이전 위젯을 아래에 유지한 상태로 새 위젯을 부드럽게 페이드인하여 화면 끊김 및 깜빡임 완전 제거
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 550),
+      switchInCurve: Curves.easeInOut,
+      switchOutCurve: Curves.easeInOut,
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            ...previousChildren,
+            ?currentChild,
+          ],
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey('${currentAd.id}_${widget.currentIndex}'),
+        child: _buildMediaContent(currentAd),
+      ),
+    );
+  }
+
+  Widget _buildMediaContent(AdItem ad) {
+    if (_hasError) {
+      return _buildErrorPlaceholder(ad, message: _errorMessage);
+    }
+
+    if (ad.type == AdMediaType.image) {
+      return _buildImageView(ad);
+    } else {
+      return _buildVideoView(ad);
+    }
+  }
+
+  Widget _buildImageView(AdItem ad) {
     Widget imageWidget;
 
-    if (widget.adItem.sourceType == AdSourceType.network) {
+    if (ad.sourceType == AdSourceType.network) {
       imageWidget = Image.network(
-        widget.adItem.path,
+        ad.path,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
+        // 로딩 중일 때 무거운 검은색 스피너를 전면에 띄우지 않고,
+        // Stack 아래에 있는 이전 광고 화면이 자연스럽게 유지되도록 처리!
         loadingBuilder: (context, child, progress) {
           if (progress == null) return child;
-          return _buildLoadingPlaceholder();
+          return const SizedBox.expand();
         },
         errorBuilder: (context, error, stackTrace) {
-          return _buildErrorPlaceholder();
+          return _buildErrorPlaceholder(ad);
         },
       );
     } else {
       if (kIsWeb) {
-        imageWidget = _buildErrorPlaceholder(message: '웹 브라우저에서는 네트워크 URL 이미지를 권장합니다.');
+        imageWidget = _buildErrorPlaceholder(
+          ad,
+          message: '웹 브라우저에서는 네트워크 URL 이미지를 권장합니다.',
+        );
       } else {
         imageWidget = Image.file(
-          File(widget.adItem.path),
+          File(ad.path),
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
           errorBuilder: (context, error, stackTrace) {
-            return _buildErrorPlaceholder();
+            return _buildErrorPlaceholder(ad);
           },
         );
       }
@@ -225,18 +386,17 @@ class _AdMediaViewState extends State<AdMediaView> {
       fit: StackFit.expand,
       children: [
         imageWidget,
-        _buildBottomGradientTitle(),
+        _buildBottomGradientTitle(ad),
       ],
     );
   }
 
-  Widget _buildVideoView() {
-    if (_isVideoLoading) {
-      return _buildLoadingPlaceholder();
-    }
+  Widget _buildVideoView(AdItem ad) {
+    final controller = _currentVideoController;
 
-    if (_videoController == null || !_videoController!.value.isInitialized) {
-      return _buildLoadingPlaceholder();
+    // 비디오가 아직 로딩 중이면 검은 스피너 대신 빈 화면(아래의 이전 광고 화면이 비침) 유지
+    if (controller == null || !controller.value.isInitialized) {
+      return const SizedBox.expand();
     }
 
     return Stack(
@@ -244,34 +404,22 @@ class _AdMediaViewState extends State<AdMediaView> {
       children: [
         Center(
           child: AspectRatio(
-            aspectRatio: _videoController!.value.aspectRatio,
-            child: VideoPlayer(_videoController!),
+            aspectRatio: controller.value.aspectRatio,
+            child: VideoPlayer(controller),
           ),
         ),
-        _buildBottomGradientTitle(),
+        _buildBottomGradientTitle(ad),
       ],
     );
   }
 
-  Widget _buildLoadingPlaceholder() {
-    return Container(
-      color: AppColors.ink,
-      child: const Center(
-        child: CircularProgressIndicator(
-          color: AppColors.primary,
-          strokeWidth: 3,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorPlaceholder({String? message}) {
+  Widget _buildErrorPlaceholder(AdItem ad, {String? message}) {
     return Container(
       color: const Color(0xFF1E293B),
       padding: const EdgeInsets.all(24),
       child: Center(
         child: Column(
-          mainAxisSize: minAxisSize(),
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
               Icons.broken_image_rounded,
@@ -280,7 +428,7 @@ class _AdMediaViewState extends State<AdMediaView> {
             ),
             const SizedBox(height: 16),
             Text(
-              widget.adItem.title,
+              ad.title,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
@@ -303,10 +451,8 @@ class _AdMediaViewState extends State<AdMediaView> {
     );
   }
 
-  MainAxisSize minAxisSize() => MainAxisSize.min;
-
-  Widget _buildBottomGradientTitle() {
-    if (widget.adItem.title.isEmpty) return const SizedBox.shrink();
+  Widget _buildBottomGradientTitle(AdItem ad) {
+    if (ad.title.isEmpty) return const SizedBox.shrink();
 
     return Positioned(
       left: 0,
@@ -329,13 +475,13 @@ class _AdMediaViewState extends State<AdMediaView> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: widget.adItem.type == AdMediaType.video
+                color: ad.type == AdMediaType.video
                     ? AppColors.primary
                     : AppColors.secondary,
                 borderRadius: BorderRadius.circular(9999),
               ),
               child: Text(
-                widget.adItem.type.displayName,
+                ad.type.displayName,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -346,7 +492,7 @@ class _AdMediaViewState extends State<AdMediaView> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                widget.adItem.title,
+                ad.title,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
